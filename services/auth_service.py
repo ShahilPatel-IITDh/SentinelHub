@@ -12,22 +12,45 @@ def register_user(db: Session, user):
     logger.info(f"Register attempt for employee_id={user.employee_id}")
 
     try:
-        # Check if user already exists
+        # ✅ Ensure employee_id is int
+        try:
+            employee_id = int(user.employee_id)
+        except:
+            raise HTTPException(
+                status_code=400,
+                detail="employee_id must be an integer"
+            )
+
+        # ✅ Password validation
+        plain_password = str(user.password)
+
+        if len(plain_password) < 6:
+            raise HTTPException(
+                status_code=400,
+                detail="Password must be at least 6 characters"
+            )
+
+        if len(plain_password.encode("utf-8")) > 72:
+            raise HTTPException(
+                status_code=400,
+                detail="Password too long (max 72 bytes)"
+            )
+
+        # ✅ Check if user already exists
         existing = db.query(User).filter(
-            User.employee_id == user.employee_id
+            User.employee_id == employee_id
         ).first()
 
         if existing:
-            logger.warning("User already exists")
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
+                status_code=400,
                 detail="User already exists"
             )
 
-        # Optional: validate reporting officer (important for hierarchy)
-        if user.reporting_officer_id != 0:
+        # ✅ Validate reporting officer (FIXED)
+        if user.reporting_officer_id:
             manager = db.query(User).filter(
-                User.id == user.reporting_officer_id
+                User.employee_id == user.reporting_officer_id
             ).first()
 
             if not manager:
@@ -36,11 +59,11 @@ def register_user(db: Session, user):
                     detail="Reporting officer not found"
                 )
 
-        # Create user
+        # ✅ Create user
         new_user = User(
             name=user.name,
-            employee_id=user.employee_id,
-            password=hash_password(user.password),
+            employee_id=employee_id,
+            password=hash_password(plain_password),
             designation=user.designation,
             reporting_officer_id=user.reporting_officer_id
         )
@@ -49,12 +72,12 @@ def register_user(db: Session, user):
         db.commit()
         db.refresh(new_user)
 
-        logger.info(f"User created successfully id={new_user.id}")
+        logger.info(f"User created: {new_user.employee_id}")
 
         return {
             "status": "success",
             "message": "User created",
-            "user_id": new_user.id
+            "user_id": new_user.employee_id
         }
 
     except HTTPException:
@@ -76,35 +99,42 @@ def login_user(db: Session, data):
     logger.info(f"Login attempt for employee_id={data.employee_id}")
 
     try:
+        # ✅ Ensure employee_id is int
+        try:
+            employee_id = int(data.employee_id)
+        except:
+            raise HTTPException(
+                status_code=400,
+                detail="employee_id must be an integer"
+            )
+
         user = db.query(User).filter(
-            User.employee_id == data.employee_id
+            User.employee_id == employee_id
         ).first()
 
         if not user:
-            logger.warning("User not found")
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found"
             )
 
-        if not verify_password(data.password, user.password):
-            logger.warning("Invalid password")
+        if not verify_password(str(data.password), user.password):
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid credentials"
             )
 
-        # Generate token
-        token = create_token(user.id)
+        # ✅ Generate token
+        token = create_token(user.employee_id)
 
-        logger.info(f"Login successful user_id={user.id}")
+        logger.info(f"Login successful: {user.employee_id}")
 
         return {
             "status": "success",
             "access_token": token,
             "token_type": "bearer",
             "user": {
-                "id": user.id,
+                "employee_id": user.employee_id,
                 "name": user.name,
                 "designation": user.designation
             }
