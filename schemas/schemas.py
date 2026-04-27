@@ -1,19 +1,23 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
+
+# ---------------- AUTH ---------------- #
 
 class RegisterUser(BaseModel):
     name: str
-    employee_id: str
+    employee_id: int
     password: str
     designation: str
-    reporting_officer_id: int
+    reporting_officer_id: Optional[int] = None   # ✅ FIXED
 
 
 class LoginUser(BaseModel):
-    employee_id: str
+    employee_id: int
     password: str
 
+
+# ---------------- HEARTBEAT ---------------- #
 
 class Heartbeat(BaseModel):
     mac_address: str
