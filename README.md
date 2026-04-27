@@ -39,3 +39,72 @@ A clean, Python-powered dashboard.
 - **Data Encryption**: All data transmitted between SentinelNode and SentinelServer is encrypted using cryptographic protocols to ensure confidentiality.
 
 
+
+---
+
+## ⚙️ Setup Instructions
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/ShahilPatel-IITDh/SentinelHub.git
+cd SentinelHub
+
+### 2. Create virtual environment
+```bash
+python -m venv venv
+```
+Activate:
+**Windows:**
+```bash
+venv\Scripts\activate
+```
+**Mac/Linux:**
+
+```bash
+source venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## ▶️ Running the Server
+
+```bash
+uvicorn main:app --reload
+```
+
+Server runs at:
+👉 http://127.0.0.1:8000
+
+---
+
+## 📡 API Endpoints
+
+### 🔐 Authentication
+
+* POST `/auth/login`
+
+### 🖥️ Nodes
+
+* GET `/nodes`
+* POST `/nodes`
+
+### ❤️ Heartbeat
+
+* POST `/heartbeat`
+
+### 📊 Logs & Summary
+
+* GET `/logs`
+* GET `/summary`
+
+---
+
+
+
