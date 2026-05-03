@@ -1,7 +1,15 @@
-.env
-/__pycache__
-*.db
+# Python
 __pycache__/
 *.pyc
+
+# Virtual env
 venv/
+
+# Env files
 .env
+
+# Database
+*.db
+
+# Logs
+*.log
