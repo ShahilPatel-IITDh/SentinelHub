@@ -1,6 +1,6 @@
-# 🚀 SentinelHub
+# SentinelHub
 
-### 🧠 Distributed System Monitoring Platform (LAN-Based)
+### Distributed System Monitoring Platform (LAN-Based)
 
 ![Python](https://img.shields.io/badge/Python-3.x-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
@@ -10,13 +10,13 @@
 
 ---
 
-# 🌍 What is SentinelHub?
+# What is SentinelHub?
 
 SentinelHub is a **real-time system monitoring platform** where:
 
-* 🖥️ Multiple computers send their data
-* 🧠 One server processes everything
-* 📊 One dashboard shows everything
+* Multiple computers send their data
+* One server processes everything
+*One dashboard shows everything
 
 ---
 
@@ -32,13 +32,13 @@ Imagine:
 
 ---
 
-# 🧩 Architecture Diagram
+# Architecture Diagram
 
 ```
-         📊 Dashboard (Sentinel-Dash)
+         Dashboard (Sentinel-Dash)
                   │
                   ▼
-        🧠 Server (FastAPI Backend)
+        Server (FastAPI Backend)
                   │
           ┌───────┴────────┐
           ▼                ▼
@@ -65,19 +65,19 @@ SentinelHub/
 
 ---
 
-# ✨ What is Built
+# What is Built
 
-## 🔥 Core Achievements
+## Core Achievements
 
-### ✅ Distributed Monitoring System
+### Distributed Monitoring System
 
 * Multiple clients send system data to one server
 
-### ✅ Real-Time Data Flow (Simulated)
+### Real-Time Data Flow (Simulated)
 
 * Continuous data updates (heartbeat mechanism)
 
-### ✅ Backend API (FastAPI)
+### Backend API (FastAPI)
 
 * Handles:
 
@@ -86,23 +86,23 @@ SentinelHub/
   * Data ingestion
   * Data retrieval
 
-### ✅ System Metrics Tracking
+### System Metrics Tracking
 
 * CPU usage
 * Memory usage
 * Disk usage
 * Running processes
 
-### ✅ Logging System
+### Logging System
 
 * Structured logs
 * Severity levels (INFO, ERROR, etc.)
 
-### ✅ Dashboard Integration
+### Dashboard Integration
 
 * Displays live system data
 
-### ✅ Database Integration
+### Database Integration
 
 * Stores:
 
@@ -112,37 +112,36 @@ SentinelHub/
 
 ---
 
-# ⚠️ Honest Reality (Very Important)
+# Current-Status
 
 This project is **NOT production-ready yet**.
 
-### ❌ Missing Features:
+### Missing Features:
 
 * No JWT authentication
 * No password hashing (or basic)
 * No HTTPS security
 * No WebSockets (real-time streaming)
 * No load balancing
-* No cloud deployment
 
 👉 This is a **strong prototype / foundation system**
 
 ---
 
-# 🛠️ FULL SETUP GUIDE (EXTREMELY DETAILED)
+# FULL SETUP GUIDE (EXTREMELY DETAILED)
 
 Follow this EXACTLY.
 
 ---
 
-## 🧱 STEP 0: Install Python
+## STEP 0: Install Python
 
 Download:
-👉 https://www.python.org/downloads/
+https://www.python.org/downloads/
 
 During install:
 
-✔ Check **"Add Python to PATH"**
+Check **"Add Python to PATH"**
 
 ---
 
@@ -158,11 +157,11 @@ Wait until it finishes.
 
 ---
 
-# 🚀 STEP 2: Start the Server (MOST IMPORTANT)
+# STEP 2: Start the Server (MOST IMPORTANT)
 
 ---
 
-## 📍 Go to server folder
+## Go to server folder
 
 ```
 cd C:\SentinelHub\server
@@ -170,7 +169,7 @@ cd C:\SentinelHub\server
 
 ---
 
-## ▶️ Run server
+## Run server
 
 ```
 uvicorn main:app --reload
@@ -178,7 +177,7 @@ uvicorn main:app --reload
 
 ---
 
-## 🌐 Open API Page
+## Open API Page
 
 Open browser:
 
@@ -190,11 +189,11 @@ http://127.0.0.1:8000/docs
 
 ---
 
-# 👤 STEP 3: Register User
+# STEP 3: Register User
 
 ---
 
-## 🔍 Find:
+## Find:
 
 ```
 POST /register
@@ -204,7 +203,7 @@ Click → Try it out
 
 ---
 
-## ✏️ Enter:
+## Enter:
 
 ```json
 {
@@ -217,7 +216,7 @@ Click → Execute
 
 ---
 
-## ✅ Output:
+## Output:
 
 ```
 User created successfully
@@ -225,11 +224,11 @@ User created successfully
 
 ---
 
-# ▶️ STEP 4: Run Client
+# STEP 4: Run Client
 
 ---
 
-## 📍 Open NEW terminal
+## Open NEW terminal
 
 ```
 cd C:\SentinelHub\client
@@ -237,7 +236,7 @@ cd C:\SentinelHub\client
 
 ---
 
-## ▶️ Run:
+## Run:
 
 ```
 python client.py
@@ -245,7 +244,7 @@ python client.py
 
 ---
 
-## 🔄 What happens?
+## What happens?
 
 Client sends:
 
@@ -258,11 +257,11 @@ to server continuously
 
 ---
 
-# 📊 STEP 5: Run Dashboard
+# STEP 5: Run Dashboard
 
 ---
 
-## 📍 Open ANOTHER terminal
+## Open ANOTHER terminal
 
 ```
 cd C:\SentinelHub\dashboard
@@ -270,7 +269,7 @@ cd C:\SentinelHub\dashboard
 
 ---
 
-## ▶️ Run:
+## Run:
 
 ```
 python dashboard.py
@@ -278,7 +277,7 @@ python dashboard.py
 
 ---
 
-# 🎉 SUCCESS CHECK
+# SUCCESS CHECK
 
 | Component | Expected        |
 | --------- | --------------- |
@@ -288,7 +287,7 @@ python dashboard.py
 
 ---
 
-# 🧪 TEST FLOW
+# TEST FLOW
 
 1. Start server
 2. Register user
@@ -297,7 +296,7 @@ python dashboard.py
 
 ---
 
-# 🧠 Data Flow (Simple)
+# Data Flow (Simple)
 
 ```
 Client → Server → Database
@@ -307,7 +306,7 @@ Client → Server → Database
 
 ---
 
-# 🧹 Clean Repository Note
+# Clean Repository Note
 
 This version contains only:
 
@@ -315,7 +314,7 @@ This version contains only:
 ✔ client
 ✔ dashboard
 
-❌ Removed:
+Removed:
 
 * Old backend structure
 * Cache files
@@ -323,19 +322,19 @@ This version contains only:
 
 ---
 
-# ⚠️ Common Errors + Fixes
+# Common Errors + Fixes
 
-## ❌ uvicorn not found
+## uvicorn not found
 
 ```
 pip install uvicorn
 ```
 
-## ❌ Python not recognized
+## Python not recognized
 
 Reinstall Python with PATH enabled
 
-## ❌ Dashboard not updating
+## Dashboard not updating
 
 Check:
 
@@ -344,13 +343,11 @@ Check:
 
 ---
 
-# 🚀 FUTURE IMPROVEMENTS 
-
-This is where the project can become **industry-level**
+# FUTURE IMPROVEMENTS 
 
 ---
 
-## 🔐 Security Upgrades
+## Security Upgrades
 
 * JWT Authentication
 * Password hashing (bcrypt)
@@ -358,14 +355,14 @@ This is where the project can become **industry-level**
 
 ---
 
-## ⚡ Real-Time Features
+## Real-Time Features
 
 * WebSockets (live updates)
 * Live alerts
 
 ---
 
-## 📧 Notification System
+## Notification System
 
 * Email alerts for:
 
@@ -375,7 +372,7 @@ This is where the project can become **industry-level**
 
 ---
 
-## 🧑‍💼 Role-Based Access
+## Role-Based Access
 
 * Admin
 * Manager
@@ -383,14 +380,14 @@ This is where the project can become **industry-level**
 
 ---
 
-## 🌐 Deployment
+## Deployment
 
 * Docker containers
 * Cloud deployment (AWS / Azure / GCP)
 
 ---
 
-## 📊 Advanced Dashboard
+## Advanced Dashboard
 
 * Charts (CPU trends)
 * Historical data
@@ -398,7 +395,7 @@ This is where the project can become **industry-level**
 
 ---
 
-## 🧠 AI Additions 
+## AI Additions 
 
 * Anomaly detection
 * Predict system failures
@@ -406,14 +403,14 @@ This is where the project can become **industry-level**
 
 ---
 
-## 🔄 Scalability
+## Scalability
 
 * Load balancing
 * Microservices architecture
 
 ---
 
-# 🤝 Contribution Guide
+# Contribution Guide
 
 1. Fork repository
 2. Create new branch
