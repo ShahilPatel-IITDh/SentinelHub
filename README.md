@@ -1,422 +1,246 @@
 # SentinelHub
 
-### Distributed System Monitoring Platform (LAN-Based)
+Distributed system monitoring for LAN environments: monitored nodes send metrics and process information to a central FastAPI server; managers can inspect aggregated data via an optional dashboard.
 
-![Python](https://img.shields.io/badge/Python-3.x-blue)
+![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
 ![Architecture](https://img.shields.io/badge/Architecture-Client--Server-orange)
-![Status](https://img.shields.io/badge/Status-Active-brightgreen)
-![Beginner Friendly](https://img.shields.io/badge/Level-Beginner%20Friendly-yellow)
 
 ---
 
-# What is SentinelHub?
+## Overview
 
-SentinelHub is a **real-time system monitoring platform** where:
-
-* Multiple computers send their data
-* One server processes everything
-*One dashboard shows everything
+- **Nodes (clients)** authenticate with the server and periodically POST heartbeat payloads (CPU, memory, disk, processes, machine identifiers).
+- **Managers** use JWT-protected endpoints to view logs, metrics, summaries, and error logs for their team (employees reporting to that manager, plus the manager).
+- **Storage** uses SQLite via SQLAlchemy (`sqlite:///./sentinel.db` relative to the server working directory).
 
 ---
 
-# 🧠 Understand It Like You're 10 Years Old
-
-Imagine:
-
-* Every computer is a **student**
-* The server is the **teacher**
-* The dashboard is the **report card**
-
-👉 Students send their marks → Teacher collects → Report card shows results
-
----
-
-# Architecture Diagram
+## Architecture
 
 ```
-         Dashboard (Sentinel-Dash)
-                  │
-                  ▼
-        Server (FastAPI Backend)
-                  │
-          ┌───────┴────────┐
-          ▼                ▼
-     🗄️ Database     ⚙️ Business Logic
-                  ▲
-                  │
-      ┌───────────┼───────────┐
-      ▼           ▼           ▼
-🖥️ Node        🖥️ Node      🖥️ Node
-(Client)      (Client)     (Client)
+                    Dashboard (Streamlit)
+                             |
+                             v
+                   FastAPI (server/)
+                             |
+              +--------------+---------------+
+              |                              |
+              v                              v
+         SQLite (sentinel.db)          Business logic / services
+              ^
+              |
+    +---------+---------+
+    v                   v
+ Node client        Node client
+ (client/)          (client/)
 ```
 
 ---
 
-# 📁 Project Structure
+## Repository layout
 
-```
-SentinelHub/
-│
-├── server/        # 🔥 Backend (MOST IMPORTANT)
-├── client/        # Sends system data
-├── dashboard/     # Displays data
-```
+| Path | Purpose |
+|------|---------|
+| `server/` | FastAPI application, SQLAlchemy models, routes, services |
+| `client/` | CLI agent: login, heartbeat loop, optional log fetch |
+| `dashboard/` | Streamlit UI for manager login and team views |
 
 ---
 
-# What is Built
+## Backend capabilities (current)
 
-## Core Achievements
+| Area | Implementation |
+|------|----------------|
+| Authentication | JWT access tokens (HS256), configured via environment |
+| Passwords | Hashed with **bcrypt** (direct library usage in `server/core/security.py`) |
+| REST API | OpenAPI docs at `/docs` when the server is running |
+| Persistence | SQLite; tables created on startup (`Base.metadata.create_all`) |
 
-### Distributed Monitoring System
+### HTTP API summary
 
-* Multiple clients send system data to one server
+**Public**
 
-### Real-Time Data Flow (Simulated)
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/` | Service identity message |
+| GET | `/health` | Simple health JSON |
+| POST | `/api/auth/register` | Register user (password policy enforced in routes) |
+| POST | `/api/auth/login` | Login; returns bearer token |
 
-* Continuous data updates (heartbeat mechanism)
+**Authenticated (Bearer token)**
 
-### Backend API (FastAPI)
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/node/heartbeat` | Ingest metrics and processes for the logged-in user |
+| GET | `/api/node/logs/{manager_id}` | Process logs for manager’s team (manager-only) |
+| GET | `/api/node/summary/{manager_id}` | Aggregated counts (manager-only) |
+| GET | `/api/node/metrics/{manager_id}` | Recent system metrics (manager-only) |
+| GET | `/api/node/errors/{manager_id}` | Error log entries (manager-only) |
 
-* Handles:
+**Unauthenticated management endpoints (known limitation)**
 
-  * Register
-  * Login
-  * Data ingestion
-  * Data retrieval
+| Method | Path | Description |
+|--------|------|-------------|
+| PUT | `/api/auth/assign-manager` | Assign reporting manager to an employee |
+| PUT | `/api/auth/update-designation` | Update user designation |
 
-### System Metrics Tracking
-
-* CPU usage
-* Memory usage
-* Disk usage
-* Running processes
-
-### Logging System
-
-* Structured logs
-* Severity levels (INFO, ERROR, etc.)
-
-### Dashboard Integration
-
-* Displays live system data
-
-### Database Integration
-
-* Stores:
-
-  * Users
-  * Logs
-  * Metrics
+These two endpoints are not protected by JWT today; restrict network access or add authentication before production use.
 
 ---
 
-# Current-Status
+## Configuration
 
-This project is **NOT production-ready yet**.
+Create a `.env` file in `server/` (or ensure variables are set in the environment). The server loads it via `python-dotenv`.
 
-### Missing Features:
-
-* No JWT authentication
-* No password hashing (or basic)
-* No HTTPS security
-* No WebSockets (real-time streaming)
-* No load balancing
-
-👉 This is a **strong prototype / foundation system**
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `SECRET_KEY` | JWT signing secret | Development fallback in code (override in production) |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT lifetime | `60` |
 
 ---
 
-# FULL SETUP GUIDE (EXTREMELY DETAILED)
+## Prerequisites
 
-Follow this EXACTLY.
-
----
-
-## STEP 0: Install Python
-
-Download:
-https://www.python.org/downloads/
-
-During install:
-
-Check **"Add Python to PATH"**
+- Python 3.10 or newer recommended (3.11 is commonly used).
+- pip
 
 ---
 
-## 📦 STEP 1: Install Dependencies
+## Installation
 
-Open Command Prompt:
+### 1. Clone and enter the repository
 
-```
-pip install fastapi uvicorn psutil requests
+```bash
+cd SentinelHub
 ```
 
-Wait until it finishes.
+### 2. Server dependencies
+
+From the repository root:
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+`requirements.txt` includes FastAPI, Uvicorn, SQLAlchemy, python-dotenv, bcrypt, and python-jose.
+
+### 3. Client dependencies
+
+The heartbeat client uses `requests`, `python-dotenv`, and `psutil`:
+
+```bash
+python -m pip install requests python-dotenv psutil
+```
+
+### 4. Dashboard dependencies
+
+```bash
+python -m pip install streamlit pandas requests streamlit-autorefresh
+```
+
+Optional: set `SERVER_URL` / service URL in environment or `.env` for clients; the dashboard currently defaults to `http://127.0.0.1:8000` in code unless you change it.
 
 ---
 
-# STEP 2: Start the Server (MOST IMPORTANT)
+## Running the server
+
+Use the `server` directory as the working directory so package imports (`db`, `routes`, etc.) resolve.
+
+```bash
+cd server
+uvicorn main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Alternatively:
+
+```bash
+cd server
+python main.py
+```
+
+Interactive API documentation: `http://127.0.0.1:8000/docs`
 
 ---
 
-## Go to server folder
+## Registration and login
 
-```
-cd C:\SentinelHub\server
-```
-
----
-
-## Run server
-
-```
-uvicorn main:app --reload
-```
-
----
-
-## Open API Page
-
-Open browser:
-
-```
-http://127.0.0.1:8000/docs
-```
-
-👉 If this opens → Server is working ✅
-
----
-
-# STEP 3: Register User
-
----
-
-## Find:
-
-```
-POST /register
-```
-
-Click → Try it out
-
----
-
-## Enter:
+Registration expects JSON aligned with the `RegisterUser` schema (see `server/schemas/schemas.py`), for example:
 
 ```json
 {
-  "username": "testuser",
-  "password": "1234"
+  "name": "BEL Employee",
+  "employee_id": 123456,
+  "password": "YourPass1!",
+  "designation": "engineer",
+  "reporting_officer_id": null
 }
 ```
 
-Click → Execute
+Password rules (register): minimum length 8, uppercase, lowercase, digit, and one of `!@#$%^&*`, and at most **72 bytes** when UTF-8 encoded (bcrypt limit). Use `null` for no reporting officer; sending `0` for `reporting_officer_id` is treated as no manager.
+
+Login:
+
+```json
+{
+  "employee_id": 123456,
+  "password": "YourPass1!"
+}
+```
+
+Response includes `access_token` for `Authorization: Bearer <token>`.
 
 ---
 
-## Output:
+## Running the client
 
-```
-User created successfully
-```
-
----
-
-# STEP 4: Run Client
-
----
-
-## Open NEW terminal
-
-```
-cd C:\SentinelHub\client
-```
-
----
-
-## Run:
-
-```
+```bash
+cd client
 python client.py
 ```
 
----
-
-## What happens?
-
-Client sends:
-
-* CPU
-* Memory
-* Disk
-* Processes
-
-to server continuously
+The client logs in, sends heartbeats on an interval, and may fetch logs for the configured employee context (managers use their own employee ID when accessing manager-scoped endpoints).
 
 ---
 
-# STEP 5: Run Dashboard
+## Running the dashboard
 
----
-
-## Open ANOTHER terminal
-
-```
-cd C:\SentinelHub\dashboard
+```bash
+cd dashboard
+streamlit run app.py
 ```
 
----
-
-## Run:
-
-```
-python dashboard.py
-```
+Log in as a user with **manager** designation to use team-scoped endpoints from the UI.
 
 ---
 
-# SUCCESS CHECK
+## Database file
 
-| Component | Expected        |
-| --------- | --------------- |
-| Server    | Running + logs  |
-| Client    | Sending data    |
-| Dashboard | Showing metrics |
+SQLite database file: `sentinel.db` is created under the **current working directory** when the server runs (typically `server/sentinel.db` if you start Uvicorn from `server/`).
 
 ---
 
-# TEST FLOW
+## Production readiness
 
-1. Start server
-2. Register user
-3. Run client
-4. Run dashboard
+This project is intended as a **foundation / prototype**, not a hardened production deployment.
 
----
+**Already in place:** JWT authentication for protected node routes, bcrypt password hashing, structured logging and metrics persistence.
 
-# Data Flow (Simple)
-
-```
-Client → Server → Database
-        ↓
-     Dashboard
-```
+**Still recommended before production:** HTTPS termination, secrets management, authenticated administrative routes, rate limiting, backups, monitoring, and deployment-specific hardening. WebSockets, push notifications, and horizontal scaling are not implemented.
 
 ---
 
-# Clean Repository Note
+## Roadmap ideas
 
-This version contains only:
-
-✔ server
-✔ client
-✔ dashboard
-
-Removed:
-
-* Old backend structure
-* Cache files
-* Unused folders
+- Secure `assign-manager` and `update-designation` with role-based authentication.
+- Optional POST endpoint for client-reported errors (schema exists; wiring may be added).
+- WebSocket or SSE for live dashboard updates.
+- TLS and reverse proxy documentation.
 
 ---
 
-# Common Errors + Fixes
+## Contributing
 
-## uvicorn not found
-
-```
-pip install uvicorn
-```
-
-## Python not recognized
-
-Reinstall Python with PATH enabled
-
-## Dashboard not updating
-
-Check:
-
-* Server running
-* Client running
-
----
-
-# FUTURE IMPROVEMENTS 
-
----
-
-## Security Upgrades
-
-* JWT Authentication
-* Password hashing (bcrypt)
-* HTTPS support
-
----
-
-## Real-Time Features
-
-* WebSockets (live updates)
-* Live alerts
-
----
-
-## Notification System
-
-* Email alerts for:
-
-  * High CPU usage
-  * System crash
-  * Unauthorized access
-
----
-
-## Role-Based Access
-
-* Admin
-* Manager
-* User
-
----
-
-## Deployment
-
-* Docker containers
-* Cloud deployment (AWS / Azure / GCP)
-
----
-
-## Advanced Dashboard
-
-* Charts (CPU trends)
-* Historical data
-* Filters per machine
-
----
-
-## AI Additions 
-
-* Anomaly detection
-* Predict system failures
-* Smart alerts
-
----
-
-## Scalability
-
-* Load balancing
-* Microservices architecture
-
----
-
-# Contribution Guide
-
-1. Fork repository
-2. Create new branch
-3. Make changes
-4. Submit Pull Request
-
----
-
-
+1. Fork the repository  
+2. Create a branch for your changes  
+3. Submit a pull request with a clear description  
