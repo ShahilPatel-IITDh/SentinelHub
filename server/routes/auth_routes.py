@@ -28,7 +28,20 @@ def get_db():
 
 
 # ---------------- PASSWORD VALIDATION ---------------- #
+BCRYPT_MAX_PASSWORD_BYTES = 72
+
+
+def validate_password_byte_length(password: str):
+    if len(password.encode("utf-8")) > BCRYPT_MAX_PASSWORD_BYTES:
+        raise HTTPException(
+            400,
+            "Password cannot exceed 72 bytes (bcrypt limit)",
+        )
+
+
 def validate_password(password: str):
+    validate_password_byte_length(password)
+
     if len(password) < 8:
         raise HTTPException(400, "Password must be at least 8 characters")
 
@@ -55,6 +68,7 @@ def register(user: RegisterUser, db: Session = Depends(get_db)):
 
 @router.post("/login")
 def login(data: LoginUser, db: Session = Depends(get_db)):
+    validate_password_byte_length(data.password)
     return login_user(db, data)
 
 
