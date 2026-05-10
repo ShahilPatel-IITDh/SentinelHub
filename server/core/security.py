@@ -1,20 +1,28 @@
+import bcrypt
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status
 from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# ---------------- PASSWORD (bcrypt directly — avoids passlib / bcrypt version quirks) ---------------- #
+
+def hash_password(password: str) -> str:
+    pw = password.encode("utf-8")
+    if len(pw) > 72:
+        raise ValueError(
+            "password cannot be longer than 72 bytes, truncate manually if necessary "
+            "(e.g. my_password[:72])"
+        )
+    hashed = bcrypt.hashpw(pw, bcrypt.gensalt())
+    return hashed.decode("utf-8")
 
 
-# ---------------- PASSWORD ---------------- #
-
-def hash_password(password: str):
-    return pwd_context.hash(password)
-
-
-def verify_password(plain: str, hashed: str):
-    return pwd_context.verify(plain, hashed)
+def verify_password(plain: str, hashed: str) -> bool:
+    try:
+        return bcrypt.checkpw(plain.encode("utf-8"), hashed.encode("utf-8"))
+    except ValueError:
+        return False
 
 
 # ---------------- TOKEN CREATE ---------------- #
