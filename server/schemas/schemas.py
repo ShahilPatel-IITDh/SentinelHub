@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional
 
 
@@ -10,6 +10,13 @@ class RegisterUser(BaseModel):
     password: str
     designation: str
     reporting_officer_id: Optional[int] = None
+
+    @field_validator("reporting_officer_id", mode="before")
+    @classmethod
+    def zero_means_no_manager(cls, v: Optional[int]) -> Optional[int]:
+        if v == 0:
+            return None
+        return v
 
 
 class LoginUser(BaseModel):
