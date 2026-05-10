@@ -26,15 +26,19 @@ def register_user(db: Session, user):
                 detail="User already exists"
             )
 
-        # ✅ Allow employee without manager
-        if user.reporting_officer_id is not None:
+        reporting_officer_id = user.reporting_officer_id
+        if reporting_officer_id == 0:
+            reporting_officer_id = None
+
+        # Allow employee without manager
+        if reporting_officer_id is not None:
             manager = db.query(User).filter(
-                User.employee_id == user.reporting_officer_id
+                User.employee_id == reporting_officer_id
             ).first()
 
             if not manager:
                 logger.warning(
-                    f"[REGISTER] Manager {user.reporting_officer_id} not found for user {employee_id}"
+                    f"[REGISTER] Manager {reporting_officer_id} not found for user {employee_id}"
                 )
 
         new_user = User(
@@ -42,7 +46,7 @@ def register_user(db: Session, user):
             employee_id=employee_id,
             password=hash_password(str(user.password)),
             designation=user.designation,
-            reporting_officer_id=user.reporting_officer_id
+            reporting_officer_id=reporting_officer_id,
         )
 
         db.add(new_user)
@@ -129,7 +133,7 @@ def assign_manager(db: Session, employee_id: int, manager_id: int):
         if not manager:
             raise HTTPException(404, "Manager not found")
 
-        # ✅ Ensure manager role
+        # Ensure manager role
         if manager.designation.lower() != "manager":
             raise HTTPException(
                 400,
