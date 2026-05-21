@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+sqlalchemy
+python-dotenv
+bcrypt>=4.0.1
+python-jose
+streamlit
+requests
