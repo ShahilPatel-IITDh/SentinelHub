@@ -9,6 +9,7 @@ class RegisterUser(BaseModel):
     employee_id: int
     password: str
     designation: str
+    post_id: Optional[int] = None
     reporting_officer_id: Optional[int] = None
 
     @field_validator("reporting_officer_id", mode="before")
@@ -23,8 +24,26 @@ class LoginUser(BaseModel):
     employee_id: int
     password: str
 
-
 # ---------------- MANAGEMENT ---------------- #
+
+class CreatePost(BaseModel):
+    title: str
+    level: int
+    can_monitor: bool = False
+    can_manage_hierarchy: bool = False
+
+
+class UpdateUserPost(BaseModel):
+    employee_id: int
+    post_id: int
+
+
+class AssignReportingOfficer(BaseModel):
+    employee_id: int
+    reporting_officer_id: int
+
+
+
 
 class AssignManager(BaseModel):
     employee_id: int

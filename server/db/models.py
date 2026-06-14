@@ -4,6 +4,21 @@ from datetime import datetime
 from db.database import Base
 
 
+# ---------------- POST / HIERARCHY ---------------- #
+
+class Post(Base):
+    __tablename__ = "posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, unique=True, nullable=False, index=True)
+    level = Column(Integer, nullable=False, index=True)
+
+    
+    can_monitor = Column(Integer, default=0)          
+    can_manage_hierarchy = Column(Integer, default=0) 
+
+    users = relationship("User", back_populates="post")
+
 # ---------------- USER ---------------- #
 
 class User(Base):
@@ -13,6 +28,9 @@ class User(Base):
     name = Column(String, nullable=False)
     password = Column(String, nullable=False)
     designation = Column(String, nullable=False)
+    
+    # New hierarchy-based post
+    post_id = Column(Integer, ForeignKey("posts.id"), nullable=True, index=True)
 
     reporting_officer_id = Column(
         Integer,
@@ -26,7 +44,9 @@ class User(Base):
         remote_side=[employee_id],
         backref="subordinates"
     )
-
+    
+    post = relationship("Post", back_populates="users")
+    
     machines = relationship(
         "Machine",
         back_populates="user",

@@ -52,3 +52,47 @@ def get_summary(db: Session, manager_id: int):
     except Exception as e:
         logger.error(f"[SUMMARY_SERVICE] Error: {str(e)}")
         raise HTTPException(500, "Internal server error")
+    
+
+# Additional helper for summary endpoint to get summary for any list of employee IDs (used by hierarchy service) #
+
+def get_summary_for_employee_ids(db, employee_ids):
+    if not employee_ids:
+        return {
+            "total_juniors": 0,
+            "total_machines": 0,
+            "active_machines": 0,
+            "inactive_machines": 0,
+            "total_processes": 0
+        }
+
+    active_threshold = datetime.utcnow() - timedelta(minutes=5)
+
+    total_machines = (
+        db.query(Machine)
+        .filter(Machine.employee_id.in_(employee_ids))
+        .count()
+    )
+
+    active_machines = (
+        db.query(Machine)
+        .filter(
+            Machine.employee_id.in_(employee_ids),
+            Machine.last_seen >= active_threshold
+        )
+        .count()
+    )
+
+    total_processes = (
+        db.query(ProcessLog)
+        .filter(ProcessLog.employee_id.in_(employee_ids))
+        .count()
+    )
+
+    return {
+        "total_juniors": len(employee_ids),
+        "total_machines": total_machines,
+        "active_machines": active_machines,
+        "inactive_machines": total_machines - active_machines,
+        "total_processes": total_processes
+    }

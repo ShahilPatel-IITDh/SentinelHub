@@ -2,8 +2,48 @@ import streamlit as st
 import requests
 import pandas as pd
 from streamlit_autorefresh import st_autorefresh
+import os
+from dotenv import load_dotenv
 
-BASE_URL = "http://127.0.0.1:8000"
+load_dotenv()
+
+BASE_URL = os.getenv("SERVER_URL", "http://127.0.0.1:8000").rstrip("/")
+
+#------------------ HELPERS for authorization ---------------- #
+def get_auth_headers():
+    token = st.session_state.get("token")
+
+    if not token:
+        return {}
+
+    return {
+        "Authorization": f"Bearer {token}"
+    }
+
+def api_get(path):
+    try:
+        response = requests.get(
+            f"{BASE_URL}{path}",
+            headers=get_auth_headers(),
+            timeout=10
+        )
+
+        if response.status_code == 401:
+            st.error("Session expired or invalid token. Please login again.")
+            st.session_state.clear()
+            st.stop()
+
+        if response.status_code == 403:
+            st.error("Access denied. You do not have permission to view this data.")
+            return None
+
+        response.raise_for_status()
+        return response.json()
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"API request failed: {e}")
+        return None
+    
 
 st.set_page_config(page_title="Sentinel Dashboard", layout="wide")
 st_autorefresh(interval=5000, key="refresh")
@@ -14,79 +54,119 @@ if "last_error_count" not in st.session_state:
 
 # ---------------- LOGIN ---------------- #
 
-st.sidebar.title("🔐 Manager Login")
+st.sidebar.title("🔐 Post Wise Login")
 
 emp_id = st.sidebar.text_input("Employee ID")
 password = st.sidebar.text_input("Password", type="password")
 
 if st.sidebar.button("Login"):
-    try:
-        res = requests.post(
-            f"{BASE_URL}/api/auth/login",
-            json={"employee_id": emp_id, "password": password}
-        )
+    if not emp_id or not password:
+        st.sidebar.error("Please enter both Employee ID and Password.")
+    else:
+        try:
+            res = requests.post(
+                f"{BASE_URL}/api/auth/login",
+                json={
+                    "employee_id": int(emp_id),
+                    "password": password
+                },
+                timeout=10
+            )
 
-        if res.status_code == 200:
-            st.session_state["token"] = res.json()["access_token"]
-            st.session_state["manager_id"] = int(emp_id)
-            st.sidebar.success("Logged in!")
-        else:
-            st.sidebar.error(res.text)
+            if res.status_code == 200:
+                data = res.json()
 
-    except Exception as e:
-        st.sidebar.error(str(e))
+                st.session_state["token"] = data.get("access_token")
+                st.session_state["employee_id"] = int(emp_id)
+                st.session_state["is_logged_in"] = True
+
+                st.sidebar.success("Logged in successfully!")
+
+            else:
+                st.sidebar.error("Invalid employee ID or password.")
+
+        except ValueError:
+            st.sidebar.error("Employee ID must be a number.")
+
+        except requests.exceptions.RequestException as e:
+            st.sidebar.error(f"Server connection failed: {e}")
+
 
 
 # ---------------- MAIN ---------------- #
 
-if "token" in st.session_state:
+def rerun_app():
+    try:
+        st.rerun()
+    except AttributeError:
+        st.experimental_rerun()
 
-    headers = {"Authorization": f"Bearer {st.session_state['token']}"}
-    manager_id = st.session_state["manager_id"]
 
-    st.title("📊 Sentinel Monitoring Dashboard")
+if "last_error_count" not in st.session_state:
+    st.session_state["last_error_count"] = 0
+
+
+if st.session_state.get("is_logged_in") and st.session_state.get("token"):
+
+    st.title("📊 Sentinel Hierarchy Monitoring Dashboard")
+    st.info("Monitoring Scope: Direct Juniors Only")
+
+    logged_employee_id = st.session_state.get("employee_id")
+    st.sidebar.success(f"Logged in as Employee ID: {logged_employee_id}")
+
+    if st.sidebar.button("Logout"):
+        st.session_state.clear()
+        rerun_app()
+
+    # ---------------- DIRECT JUNIORS ---------------- #
+    st.subheader("👥 Direct Juniors")
+
+    juniors = api_get("/api/node/juniors")
+
+    if juniors:
+        junior_df = pd.DataFrame(juniors)
+        st.dataframe(junior_df, use_container_width=True)
+    else:
+        st.warning("No direct juniors assigned under your hierarchy.")
+
+    st.divider()
 
     # ---------------- SUMMARY ---------------- #
-    summary_res = requests.get(
-        f"{BASE_URL}/api/node/summary/{manager_id}",
-        headers=headers
-    )
+    st.subheader("📌 Team Summary")
 
-    if summary_res.status_code == 200:
-        summary = summary_res.json()
+    summary = api_get("/api/node/summary")
 
-        col1, col2, col3, col4 = st.columns(4)
+    if summary:
+        col1, col2, col3, col4, col5 = st.columns(5)
 
-        col1.metric("Total Machines", summary["total_machines"])
-        col2.metric("Active Machines", summary["active_machines"])
-        col3.metric("Inactive Machines", summary["inactive_machines"])
-        col4.metric("Total Processes", summary["total_processes"])
+        col1.metric("Total Juniors", summary.get("total_juniors", 0))
+        col2.metric("Total Machines", summary.get("total_machines", 0))
+        col3.metric("Active Machines", summary.get("active_machines", 0))
+        col4.metric("Inactive Machines", summary.get("inactive_machines", 0))
+        col5.metric("Total Processes", summary.get("total_processes", 0))
+    else:
+        st.info("No summary data available.")
 
     st.divider()
 
     # ---------------- LOGS ---------------- #
     st.subheader("📄 Process Logs")
 
-    logs_res = requests.get(
-        f"{BASE_URL}/api/node/logs/{manager_id}",
-        headers=headers
-    )
+    logs = api_get("/api/node/logs")
 
-    if logs_res.status_code == 200:
-        logs = logs_res.json()
+    if logs:
+        df = pd.DataFrame(logs)
 
-        if logs:
-            df = pd.DataFrame(logs)
+        if "timestamp" in df.columns:
             df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-            # 🔍 Search
-            search = st.text_input("Search process")
+        search = st.text_input("Search process")
 
-            if search:
-                df = df[df["process_name"].str.contains(search, case=False)]
+        if search and "process_name" in df.columns:
+            df = df[df["process_name"].str.contains(search, case=False, na=False)]
 
-            # 👤 Employee filter
-            employees = sorted(df["employee_id"].unique().tolist())
+        if "employee_id" in df.columns:
+            employees = sorted(df["employee_id"].dropna().unique().tolist())
             selected_employee = st.selectbox(
                 "Filter by Employee",
                 ["All"] + employees
@@ -95,41 +175,46 @@ if "token" in st.session_state:
             if selected_employee != "All":
                 df = df[df["employee_id"] == selected_employee]
 
-            # 🖥️ Machine filter
-            machines = df["machine_mac"].unique().tolist()
+        machine_column = None
+
+        if "machine_mac" in df.columns:
+            machine_column = "machine_mac"
+        elif "mac_address" in df.columns:
+            machine_column = "mac_address"
+
+        if machine_column:
+            machines = df[machine_column].dropna().unique().tolist()
             selected_machine = st.selectbox(
                 "Filter by Machine",
                 ["All"] + machines
             )
 
             if selected_machine != "All":
-                df = df[df["machine_mac"] == selected_machine]
+                df = df[df[machine_column] == selected_machine]
 
+        if "timestamp" in df.columns:
             df = df.sort_values(by="timestamp", ascending=False)
 
-            st.dataframe(df.head(20), use_container_width=True)
+        st.dataframe(df.head(20), use_container_width=True)
 
-        else:
-            st.info("No logs available")
+    else:
+        st.info("No process logs available for your direct juniors.")
 
     st.divider()
 
     # ---------------- METRICS ---------------- #
     st.subheader("🧠 System Performance")
 
-    metrics_res = requests.get(
-        f"{BASE_URL}/api/node/metrics/{manager_id}",
-        headers=headers
-    )
+    metrics = api_get("/api/node/metrics")
 
-    if metrics_res.status_code == 200:
-        metrics = metrics_res.json()
+    if metrics:
+        mdf = pd.DataFrame(metrics)
 
-        if metrics:
-            mdf = pd.DataFrame(metrics)
+        if "timestamp" in mdf.columns:
             mdf["timestamp"] = pd.to_datetime(mdf["timestamp"])
 
-            machines = mdf["mac_address"].unique().tolist()
+        if "mac_address" in mdf.columns:
+            machines = mdf["mac_address"].dropna().unique().tolist()
 
             selected_machine = st.selectbox(
                 "Select Machine",
@@ -146,46 +231,68 @@ if "token" in st.session_state:
 
                 machine_df = mdf[mdf["mac_address"] == machine]
 
-                st.line_chart(
-                    machine_df.set_index("timestamp")[["cpu", "memory", "disk"]]
-                )
+                if "timestamp" in machine_df.columns:
+                    machine_df = machine_df.sort_values(by="timestamp")
+
+                metric_columns = []
+
+                for col in ["cpu_percent", "memory_percent", "disk_percent"]:
+                    if col in machine_df.columns:
+                        metric_columns.append(col)
+
+                for col in ["cpu", "memory", "disk"]:
+                    if col in machine_df.columns:
+                        metric_columns.append(col)
+
+                if metric_columns and "timestamp" in machine_df.columns:
+                    st.line_chart(
+                        machine_df.set_index("timestamp")[metric_columns]
+                    )
+                else:
+                    st.dataframe(machine_df, use_container_width=True)
+        else:
+            st.dataframe(mdf, use_container_width=True)
+
+    else:
+        st.info("No metrics available for your direct juniors.")
 
     st.divider()
 
     # ---------------- ERROR LOGS ---------------- #
     st.subheader("🚨 System Alerts")
 
-    error_res = requests.get(
-        f"{BASE_URL}/api/node/errors/{manager_id}",
-        headers=headers
-    )
+    errors = api_get("/api/node/errors")
 
-    if error_res.status_code == 200:
-        errors = error_res.json()
+    if errors:
+        edf = pd.DataFrame(errors)
 
-        if errors:
-            edf = pd.DataFrame(errors)
+        if "timestamp" in edf.columns:
             edf["timestamp"] = pd.to_datetime(edf["timestamp"])
 
-            # 🔥 Toast for new alerts
-            current_count = len(edf)
-            if current_count > st.session_state["last_error_count"]:
-                st.toast("🚨 New alert detected!", icon="⚠️")
+        current_count = len(edf)
 
-            st.session_state["last_error_count"] = current_count
+        if current_count > st.session_state["last_error_count"]:
+            st.toast("🚨 New alert detected!", icon="⚠️")
 
-            # 🔥 Latest alert banner
-            latest = edf.sort_values(by="timestamp", ascending=False).iloc[0]
+        st.session_state["last_error_count"] = current_count
 
-            if latest["severity"].upper() == "HIGH":
-                st.error(f"🚨 {latest['message']}")
-            elif latest["severity"].upper() == "MEDIUM":
-                st.warning(f"⚠️ {latest['message']}")
-            else:
-                st.info(f"ℹ️ {latest['message']}")
+        if "timestamp" in edf.columns:
+            edf = edf.sort_values(by="timestamp", ascending=False)
 
-            # 🔍 Filters
-            machines = edf["mac_address"].unique().tolist()
+        latest = edf.iloc[0]
+
+        severity = str(latest.get("severity", "")).upper()
+        message = latest.get("message", "New system alert detected.")
+
+        if severity == "HIGH":
+            st.error(f"🚨 {message}")
+        elif severity == "MEDIUM":
+            st.warning(f"⚠️ {message}")
+        else:
+            st.info(f"ℹ️ {message}")
+
+        if "mac_address" in edf.columns:
+            machines = edf["mac_address"].dropna().unique().tolist()
             selected_machine = st.selectbox(
                 "Filter Alerts by Machine",
                 ["All"] + machines
@@ -194,24 +301,25 @@ if "token" in st.session_state:
             if selected_machine != "All":
                 edf = edf[edf["mac_address"] == selected_machine]
 
-            # 🎨 Row coloring
-            def highlight(row):
-                sev = row["severity"].upper()
-                if sev == "HIGH":
-                    return ["background-color:#5c0000;color:white"] * len(row)
-                elif sev == "MEDIUM":
-                    return ["background-color:#663c00;color:white"] * len(row)
-                else:
-                    return ["background-color:#003300;color:white"] * len(row)
+        def highlight(row):
+            sev = str(row.get("severity", "")).upper()
 
-            st.dataframe(
-                edf.sort_values(by="timestamp", ascending=False)
-                   .style.apply(highlight, axis=1),
-                use_container_width=True
-            )
+            if sev == "HIGH":
+                return ["background-color:#5c0000;color:white"] * len(row)
+            elif sev == "MEDIUM":
+                return ["background-color:#663c00;color:white"] * len(row)
+            else:
+                return ["background-color:#003300;color:white"] * len(row)
 
-        else:
-            st.success("✅ No active issues")
+        st.dataframe(
+            edf.style.apply(highlight, axis=1),
+            use_container_width=True
+        )
+
+    else:
+        st.success("✅ No active issues for your direct juniors.")
 
 else:
     st.title("🔒 Please login to continue")
+    st.info("Login with your employee ID and password to view hierarchy-based monitoring data.")
+
