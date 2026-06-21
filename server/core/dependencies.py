@@ -1,6 +1,6 @@
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from db.database import SessionLocal
 from db.models import User
@@ -19,8 +19,7 @@ def get_db():
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_db)
-):
+    db: Session = Depends(get_db)):
     token = credentials.credentials
 
     try:
@@ -28,7 +27,7 @@ def get_current_user(
     except Exception:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
 
-    user = db.query(User).filter(User.employee_id == employee_id).first()
+    user = db.query(User).options(joinedload(User.post)).filter(User.employee_id == employee_id).first()
 
     if not user:
         raise HTTPException(status_code=401, detail="User not found")

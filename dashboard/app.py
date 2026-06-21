@@ -43,10 +43,29 @@ def api_get(path):
     except requests.exceptions.RequestException as e:
         st.error(f"API request failed: {e}")
         return None
-    
+
+@st.cache_data(ttl=5)
+def get_juniors_cached(token):
+    return api_get("/api/node/juniors")
+
+@st.cache_data(ttl=5)
+def get_summary_cached(token):
+    return api_get("/api/node/summary")
+
+@st.cache_data(ttl=5)
+def get_logs_cached(token):
+    return api_get("/api/node/logs")
+
+@st.cache_data(ttl=5)
+def get_metrics_cached(token):
+    return api_get("/api/node/metrics")
+
+@st.cache_data(ttl=5)
+def get_errors_cached(token):
+    return api_get("/api/node/errors")
 
 st.set_page_config(page_title="Sentinel Dashboard", layout="wide")
-st_autorefresh(interval=5000, key="refresh")
+
 
 if "last_error_count" not in st.session_state:
     st.session_state["last_error_count"] = 0
@@ -67,7 +86,7 @@ if st.sidebar.button("Login"):
             res = requests.post(
                 f"{BASE_URL}/api/auth/login",
                 json={
-                    "employee_id": int(emp_id),
+                    "employee_id": emp_id,
                     "password": password
                 },
                 timeout=10
@@ -75,9 +94,11 @@ if st.sidebar.button("Login"):
 
             if res.status_code == 200:
                 data = res.json()
+                
+                st.cache_data.clear()
 
                 st.session_state["token"] = data.get("access_token")
-                st.session_state["employee_id"] = int(emp_id)
+                st.session_state["employee_id"] = emp_id
                 st.session_state["is_logged_in"] = True
 
                 st.sidebar.success("Logged in successfully!")
@@ -102,12 +123,9 @@ def rerun_app():
         st.experimental_rerun()
 
 
-if "last_error_count" not in st.session_state:
-    st.session_state["last_error_count"] = 0
-
 
 if st.session_state.get("is_logged_in") and st.session_state.get("token"):
-
+    st_autorefresh(interval=5000, key="dashboard_refresh")
     st.title("📊 Sentinel Hierarchy Monitoring Dashboard")
     st.info("Monitoring Scope: Direct Juniors Only")
 
@@ -115,13 +133,14 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
     st.sidebar.success(f"Logged in as Employee ID: {logged_employee_id}")
 
     if st.sidebar.button("Logout"):
+        st.cache_data.clear()
         st.session_state.clear()
         rerun_app()
 
     # ---------------- DIRECT JUNIORS ---------------- #
     st.subheader("👥 Direct Juniors")
 
-    juniors = api_get("/api/node/juniors")
+    juniors = get_juniors_cached(st.session_state["token"])
 
     if juniors:
         junior_df = pd.DataFrame(juniors)
@@ -134,7 +153,7 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
     # ---------------- SUMMARY ---------------- #
     st.subheader("📌 Team Summary")
 
-    summary = api_get("/api/node/summary")
+    summary = get_summary_cached(st.session_state["token"])
 
     if summary:
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -152,7 +171,7 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
     # ---------------- LOGS ---------------- #
     st.subheader("📄 Process Logs")
 
-    logs = api_get("/api/node/logs")
+    logs = get_logs_cached(st.session_state["token"])
 
     if logs:
         df = pd.DataFrame(logs)
@@ -205,7 +224,7 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
     # ---------------- METRICS ---------------- #
     st.subheader("🧠 System Performance")
 
-    metrics = api_get("/api/node/metrics")
+    metrics = get_metrics_cached(st.session_state["token"])
 
     if metrics:
         mdf = pd.DataFrame(metrics)
@@ -261,7 +280,7 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
     # ---------------- ERROR LOGS ---------------- #
     st.subheader("🚨 System Alerts")
 
-    errors = api_get("/api/node/errors")
+    errors = get_errors_cached(st.session_state["token"])
 
     if errors:
         edf = pd.DataFrame(errors)
