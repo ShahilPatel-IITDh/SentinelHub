@@ -20,7 +20,7 @@ from services.auth_service import (
     assign_reporting_officer
 )
 from core.dependencies import get_db, require_hierarchy_admin
-from db.models import User
+from db.models import User, Post
 import re
 
 router = APIRouter(prefix="/api/auth")
@@ -78,6 +78,37 @@ def register(user: RegisterUser, db: Session = Depends(get_db)):
 def login(data: LoginUser, db: Session = Depends(get_db)):
     validate_password_byte_length(data.password)
     return login_user(db, data)
+
+
+@router.get("/posts")
+def get_posts(db: Session = Depends(get_db)):
+    posts = db.query(Post).order_by(Post.level).all()
+
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "level": p.level,
+            "can_monitor": p.can_monitor,
+            "can_manage_hierarchy": p.can_manage_hierarchy
+        }
+        for p in posts
+    ]
+
+@router.get("/users")
+def get_users(db: Session = Depends(get_db)):
+    users = db.query(User).all()
+
+    return [
+        {
+            "employee_id": u.employee_id,
+            "name": u.name,
+            "designation": u.designation,
+            "post_id": u.post_id,
+            "reporting_officer_id": u.reporting_officer_id
+        }
+        for u in users
+    ]
 
 #--------Adding New Routes for Hierarchy Management--------#
 

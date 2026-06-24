@@ -67,50 +67,12 @@ def get_errors_cached(token):
 st.set_page_config(page_title="Sentinel Dashboard", layout="wide")
 
 
+
 if "last_error_count" not in st.session_state:
     st.session_state["last_error_count"] = 0
 
 
-# ---------------- LOGIN ---------------- #
-
-st.sidebar.title("🔐 Post Wise Login")
-
-emp_id = st.sidebar.text_input("Employee ID")
-password = st.sidebar.text_input("Password", type="password")
-
-if st.sidebar.button("Login"):
-    if not emp_id or not password:
-        st.sidebar.error("Please enter both Employee ID and Password.")
-    else:
-        try:
-            res = requests.post(
-                f"{BASE_URL}/api/auth/login",
-                json={
-                    "employee_id": emp_id,
-                    "password": password
-                },
-                timeout=10
-            )
-
-            if res.status_code == 200:
-                data = res.json()
-                
-                st.cache_data.clear()
-
-                st.session_state["token"] = data.get("access_token")
-                st.session_state["employee_id"] = emp_id
-                st.session_state["is_logged_in"] = True
-
-                st.sidebar.success("Logged in successfully!")
-
-            else:
-                st.sidebar.error("Invalid employee ID or password.")
-
-        except ValueError:
-            st.sidebar.error("Employee ID must be a number.")
-
-        except requests.exceptions.RequestException as e:
-            st.sidebar.error(f"Server connection failed: {e}")
+# ---------------- AUTHENTICATION ---------------- #
 
 
 
@@ -339,6 +301,187 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
         st.success("✅ No active issues for your direct juniors.")
 
 else:
-    st.title("🔒 Please login to continue")
-    st.info("Login with your employee ID and password to view hierarchy-based monitoring data.")
+    # st.title("🔒 Please login to continue")
+    # st.info("Login with your employee ID and password to view hierarchy-based monitoring data.")
+    st.title("🔐 Sentinel Authentication")
+    st.markdown("Please login or register to access the Sentinel Hierarchy Monitoring Dashboard.")
+    st.divider()
+
+    left,centre,right = st.columns([1,2,1])
+
+    with centre:
+        tab1, tab2 = st.tabs(["Login", "Register"])
+
+    with tab1:
+        emp_id = st.text_input("Employee ID")
+        password = st.text_input("Password", type="password")
+
+        if st.button("Login"):
+            if not emp_id or not password:
+                st.error("Please enter both Employee ID and Password.")
+            else:
+                try:
+                    res = requests.post(
+                        f"{BASE_URL}/api/auth/login",
+                        json={
+                            "employee_id": emp_id,
+                            "password": password
+                        },
+                        timeout=10
+                    )
+
+                    if res.status_code == 200:
+                        data = res.json()
+                        
+                        st.cache_data.clear()
+
+                        st.session_state["token"] = data.get("access_token")
+                        st.session_state["employee_id"] = emp_id
+                        st.session_state["is_logged_in"] = True
+
+                        st.success("Logged in successfully!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid employee ID or password.")
+
+                except ValueError:
+                    st.error("Employee ID must be a number.")
+
+                except requests.exceptions.RequestException as e:
+                    st.error(f"Server connection failed: {e}")
+
+
+
+    # REGISTER
+    # ==========================================================
+
+    with tab2:
+
+        st.subheader("📝 Register New User")
+
+        name = st.text_input(
+            "Full Name"
+        )
+
+        new_emp_id = st.number_input(
+            "Employee ID",
+            min_value=1,
+            step=1
+        )
+
+        new_password = st.text_input(
+            "Password",
+            type="password",
+            key="register_password"
+        )
+
+        # ---------------- FETCH POSTS ---------------- #
+
+        posts = []
+
+        try:
+            post_response = requests.get(
+                f"{BASE_URL}/api/auth/posts",
+                timeout=5
+            )
+
+            if post_response.status_code == 200:
+                posts = post_response.json()
+
+        except:
+            pass
+
+        if not posts:
+            st.error(
+                "Could not load posts from server."
+            )
+
+        else:
+
+            post_map = {
+                p["title"]: p["id"]
+                for p in posts
+            }
+
+            selected_post = st.selectbox(
+                "Select Post",
+                list(post_map.keys())
+            )
+
+            # ---------------- FETCH USERS ---------------- #
+
+            users = []
+
+            try:
+                user_response = requests.get(
+                    f"{BASE_URL}/api/auth/users",
+                    timeout=5
+                )
+
+                if user_response.status_code == 200:
+                    users = user_response.json()
+
+            except:
+                pass
+
+            officer_map = {
+                f'{u["employee_id"]} - {u["name"]}':
+                u["employee_id"]
+                for u in users
+            }
+
+            selected_officer = st.selectbox(
+                "Reporting Officer",
+                ["None"] + list(officer_map.keys())
+            )
+
+            reporting_officer = None
+
+            if selected_officer != "None":
+                reporting_officer = officer_map[
+                    selected_officer
+                ]
+
+            # ---------------- REGISTER BUTTON ---------------- #
+
+            if st.button("Register"):
+
+                if not name:
+                    st.error("Name is required.")
+
+                elif not new_password:
+                    st.error(
+                        "Password is required."
+                    )
+
+                else:
+
+                    payload = {
+                        "name": name,
+                        "employee_id": int(new_emp_id),
+                        "password": new_password,
+                        "designation": selected_post,
+                        "post_id": post_map[selected_post],
+                        "reporting_officer_id": reporting_officer
+                    }
+
+                    try:
+                        response = requests.post(
+                            f"{BASE_URL}/api/auth/register",
+                            json=payload,
+                            timeout=10
+                        )
+
+                        if response.status_code in [200, 201]:
+                            st.success(
+                                "User registered successfully!"
+                            )
+
+                        else:
+                            st.error(
+                                response.text
+                            )
+
+                    except requests.exceptions.RequestException as e:
+                        st.error(str(e))
 
