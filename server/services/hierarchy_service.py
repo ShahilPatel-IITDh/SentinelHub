@@ -35,6 +35,7 @@ def get_direct_monitorable_junior_ids(db: Session, senior: User):
     allowed_ids = []
 
     for junior in juniors:
+
         if can_monitor_user(senior, junior):
             allowed_ids.append(junior.employee_id)
 

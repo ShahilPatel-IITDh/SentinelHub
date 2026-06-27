@@ -46,6 +46,7 @@ def register_user(db: Session, user):
             employee_id=employee_id,
             password=hash_password(str(user.password)),
             designation=user.designation,
+            post_id=user.post_id,
             reporting_officer_id=reporting_officer_id,
         )
 
