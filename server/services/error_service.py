@@ -37,3 +37,33 @@ def get_manager_errors(db: Session, manager_id: int):
     except Exception as e:
         logger.error(f"[ERROR_SERVICE] {str(e)}")
         raise HTTPException(500, "Error fetching error logs")
+    
+# Maintain the errors Log 
+
+def get_errors_for_employee_ids(
+    db,
+    employee_ids,
+    limit: int = 100
+):
+    if not employee_ids:
+        return []
+
+    errors = (
+        db.query(ErrorLog)
+        .filter(ErrorLog.employee_id.in_(employee_ids))
+        .order_by(ErrorLog.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "mac_address": e.mac_address,
+            "employee_id": e.employee_id,
+            "error_type": e.error_type,
+            "message": e.message,
+            "severity": e.severity,
+            "timestamp": e.timestamp
+        }
+        for e in errors
+    ]

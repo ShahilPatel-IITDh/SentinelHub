@@ -44,28 +44,16 @@ def api_get(path):
         st.error(f"API request failed: {e}")
         return None
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=60)
 def get_juniors_cached(token):
     return api_get("/api/node/juniors")
 
-@st.cache_data(ttl=5)
-def get_summary_cached(token):
-    return api_get("/api/node/summary")
 
 @st.cache_data(ttl=5)
-def get_logs_cached(token):
-    return api_get("/api/node/logs")
-
-@st.cache_data(ttl=5)
-def get_metrics_cached(token):
-    return api_get("/api/node/metrics")
-
-@st.cache_data(ttl=5)
-def get_errors_cached(token):
-    return api_get("/api/node/errors")
+def get_dashboard_live_cached(token):
+    return api_get("/api/node/dashboard/live")
 
 st.set_page_config(page_title="Sentinel Dashboard", layout="wide")
-
 
 
 if "last_error_count" not in st.session_state:
@@ -111,11 +99,23 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
         st.warning("No direct juniors assigned under your hierarchy.")
 
     st.divider()
+    # ======================================================
+    # FETCH DASHBOARD DATA (ONE API CALL)
+    # ======================================================
 
+    dashboard_data = get_dashboard_live_cached(
+        st.session_state["token"]
+    )
+    summary = dashboard_data.get("summary", {})
+    logs = dashboard_data.get("logs", [])
+    metrics = dashboard_data.get("metrics", [])
+    errors = dashboard_data.get("errors", [])
+
+    
     # ---------------- SUMMARY ---------------- #
-    st.subheader("📌 Team Summary")
+    st.subheader("Team Summary")
 
-    summary = get_summary_cached(st.session_state["token"])
+    # summary = get_summary_cached(st.session_state["token"])
 
     if summary:
         col1, col2, col3, col4, col5 = st.columns(5)
@@ -131,9 +131,9 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
     st.divider()
 
     # ---------------- LOGS ---------------- #
-    st.subheader("📄 Process Logs")
+    st.subheader("Process Logs")
 
-    logs = get_logs_cached(st.session_state["token"])
+    # logs = get_logs_cached(st.session_state["token"])
 
     if logs:
         df = pd.DataFrame(logs)
@@ -184,9 +184,9 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
     st.divider()
 
     # ---------------- METRICS ---------------- #
-    st.subheader("🧠 System Performance")
+    st.subheader("System Performance")
 
-    metrics = get_metrics_cached(st.session_state["token"])
+    # metrics = get_metrics_cached(st.session_state["token"])
 
     if metrics:
         mdf = pd.DataFrame(metrics)
@@ -240,9 +240,9 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
     st.divider()
 
     # ---------------- ERROR LOGS ---------------- #
-    st.subheader("🚨 System Alerts")
+    st.subheader("System Alerts")
 
-    errors = get_errors_cached(st.session_state["token"])
+    # errors = get_errors_cached(st.session_state["token"])
 
     if errors:
         edf = pd.DataFrame(errors)
@@ -253,7 +253,7 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
         current_count = len(edf)
 
         if current_count > st.session_state["last_error_count"]:
-            st.toast("🚨 New alert detected!", icon="⚠️")
+            st.toast("New alert detected!", icon="⚠️")
 
         st.session_state["last_error_count"] = current_count
 
@@ -266,11 +266,11 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
         message = latest.get("message", "New system alert detected.")
 
         if severity == "HIGH":
-            st.error(f"🚨 {message}")
+            st.error(f" {message}")
         elif severity == "MEDIUM":
-            st.warning(f"⚠️ {message}")
+            st.warning(f" {message}")
         else:
-            st.info(f"ℹ️ {message}")
+            st.info(f" {message}")
 
         if "mac_address" in edf.columns:
             machines = edf["mac_address"].dropna().unique().tolist()
@@ -298,12 +298,12 @@ if st.session_state.get("is_logged_in") and st.session_state.get("token"):
         )
 
     else:
-        st.success("✅ No active issues for your direct juniors.")
+        st.success(" No active issues for your direct juniors.")
 
 else:
-    # st.title("🔒 Please login to continue")
+    # st.title("Please login to continue")
     # st.info("Login with your employee ID and password to view hierarchy-based monitoring data.")
-    st.title("🔐 Sentinel Authentication")
+    st.title("Sentinel Authentication")
     st.markdown("Please login or register to access the Sentinel Hierarchy Monitoring Dashboard.")
     st.divider()
 
@@ -357,7 +357,7 @@ else:
 
     with tab2:
 
-        st.subheader("📝 Register New User")
+        st.subheader("Register New User")
 
         name = st.text_input(
             "Full Name"
@@ -403,10 +403,7 @@ else:
                 for p in posts
             }
 
-            selected_post = st.selectbox(
-                "Select Post",
-                list(post_map.keys())
-            )
+            selected_post = st.selectbox("Select Post", list(post_map.keys()))
 
             # ---------------- FETCH USERS ---------------- #
 
@@ -430,10 +427,7 @@ else:
                 for u in users
             }
 
-            selected_officer = st.selectbox(
-                "Reporting Officer",
-                ["None"] + list(officer_map.keys())
-            )
+            selected_officer = st.selectbox( "Reporting Officer",["None"] + list(officer_map.keys()) )
 
             reporting_officer = None
 

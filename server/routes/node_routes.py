@@ -16,6 +16,9 @@ from core.dependencies import get_db, get_current_user
 from services.hierarchy_service import get_direct_monitorable_junior_ids
 from services.log_service import get_logs_for_employee_ids
 from services.summary_service import get_summary_for_employee_ids
+from services.metrics_service import get_metrics_for_employee_ids
+from services.error_service import get_errors_for_employee_ids
+from services.dashboard_service import get_dashboard_live_data
 
 router = APIRouter(prefix="/api/node")
 security = HTTPBearer()
@@ -275,28 +278,10 @@ def get_my_junior_metrics(
 ):
     junior_ids = get_direct_monitorable_junior_ids(db, user)
 
-    if not junior_ids:
-        return []
-
-    metrics = (
-        db.query(SystemMetrics)
-        .filter(SystemMetrics.employee_id.in_(junior_ids))
-        .order_by(SystemMetrics.timestamp.desc())
-        .limit(500)
-        .all()
+    return get_metrics_for_employee_ids(
+        db,
+        junior_ids
     )
-
-    return [
-        {
-            "mac_address": m.mac_address,
-            "employee_id": m.employee_id,
-            "cpu_percent": m.cpu_percent,
-            "memory_percent": m.memory_percent,
-            "disk_percent": m.disk_percent,
-            "timestamp": m.timestamp
-        }
-        for m in metrics
-    ]
 
 
 @router.get("/errors")
@@ -306,25 +291,17 @@ def get_my_junior_errors(
 ):
     junior_ids = get_direct_monitorable_junior_ids(db, user)
 
-    if not junior_ids:
-        return []
-
-    errors = (
-        db.query(ErrorLog)
-        .filter(ErrorLog.employee_id.in_(junior_ids))
-        .order_by(ErrorLog.timestamp.desc())
-        .limit(100)
-        .all()
+    return get_errors_for_employee_ids(
+        db,
+        junior_ids
     )
 
-    return [
-        {
-            "mac_address": e.mac_address,
-            "employee_id": e.employee_id,
-            "error_type": e.error_type,
-            "message": e.message,
-            "severity": e.severity,
-            "timestamp": e.timestamp
-        }
-        for e in errors
-    ]
+@router.get("/dashboard/live")
+def get_dashboard_live(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return get_dashboard_live_data(
+        db,
+        user
+    )
