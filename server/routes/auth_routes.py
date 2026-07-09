@@ -5,26 +5,34 @@ from schemas.schemas import (
     RegisterUser,
     LoginUser,
     AssignManager,
-    UpdateDesignation
+    UpdateDesignation,
+    CreatePost,
+    UpdateUserPost,
+    AssignReportingOfficer
 )
 from services.auth_service import (
     register_user,
     login_user,
     assign_manager,
-    update_designation
+    update_designation,
+    create_post,
+    update_user_post,
+    assign_reporting_officer
 )
+from core.dependencies import get_db, require_hierarchy_admin
+from db.models import User, Post
 import re
 
 router = APIRouter(prefix="/api/auth")
 
 
-# ---------------- DB ---------------- #
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# # ---------------- DB ---------------- #
+# def get_db():
+#     db = SessionLocal()
+#     try:
+#         yield db
+#     finally:
+#         db.close()
 
 
 # ---------------- PASSWORD VALIDATION ---------------- #
@@ -72,13 +80,75 @@ def login(data: LoginUser, db: Session = Depends(get_db)):
     return login_user(db, data)
 
 
+@router.get("/posts")
+def get_posts(db: Session = Depends(get_db)):
+    posts = db.query(Post).order_by(Post.level).all()
+
+    return [
+        {
+            "id": p.id,
+            "title": p.title,
+            "level": p.level,
+            "can_monitor": p.can_monitor,
+            "can_manage_hierarchy": p.can_manage_hierarchy
+        }
+        for p in posts
+    ]
+
+@router.get("/users")
+def get_users(db: Session = Depends(get_db)):
+    users = db.query(User).all()
+
+    return [
+        {
+            "employee_id": u.employee_id,
+            "name": u.name,
+            "designation": u.designation,
+            "post_id": u.post_id,
+            "reporting_officer_id": u.reporting_officer_id
+        }
+        for u in users
+    ]
+
+#--------Adding New Routes for Hierarchy Management--------#
+
+@router.post("/posts")
+def create_post_route(
+    data: CreatePost,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_hierarchy_admin)
+):
+    return create_post(db, data)
+
+
+@router.put("/update-post")
+def update_post_route(
+    data: UpdateUserPost,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_hierarchy_admin)
+):
+    return update_user_post(db, data.employee_id, data.post_id)
+
+
+@router.put("/assign-reporting-officer")
+def assign_reporting_officer_route(
+    data: AssignReportingOfficer,
+    db: Session = Depends(get_db),
+    admin: User = Depends(require_hierarchy_admin)
+):
+    return assign_reporting_officer(
+        db,
+        data.employee_id,
+        data.reporting_officer_id
+    )
+
 # ---------------- MANAGEMENT ---------------- #
 
 @router.put("/assign-manager")
-def assign_manager_route(data: AssignManager, db: Session = Depends(get_db)):
+def assign_manager_route(data: AssignManager, db: Session = Depends(get_db), admin: User = Depends(require_hierarchy_admin)):
     return assign_manager(db, data.employee_id, data.manager_id)
 
 
 @router.put("/update-designation")
-def update_designation_route(data: UpdateDesignation, db: Session = Depends(get_db)):
+def update_designation_route(data: UpdateDesignation, db: Session = Depends(get_db), admin: User = Depends(require_hierarchy_admin)):
     return update_designation(db, data.employee_id, data.designation)

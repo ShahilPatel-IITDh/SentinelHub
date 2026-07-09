@@ -1,11 +1,17 @@
 from fastapi import FastAPI # type: ignore
 from db.database import engine, Base
 from routes import auth_routes, node_routes
-
-# Create DB tables
-Base.metadata.create_all(bind=engine)
+from scripts.seed_posts import seed_posts
 
 app = FastAPI(title="Sentinel Monitoring System")
+# # Create DB tables
+# Base.metadata.create_all(bind=engine)
+# # Seed default posts
+# seed_posts()
+@app.on_event("startup")
+def startup_event():
+    Base.metadata.create_all(bind=engine)
+    seed_posts()
 
 # Include routers
 app.include_router(auth_routes.router)

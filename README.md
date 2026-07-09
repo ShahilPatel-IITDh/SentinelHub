@@ -1,246 +1,533 @@
 # SentinelHub
 
-Distributed system monitoring for LAN environments: monitored nodes send metrics and process information to a central FastAPI server; managers can inspect aggregated data via an optional dashboard.
+**SentinelHub** is a Python-based distributed system monitoring platform for organization and LAN environments.
+Client machines send system information such as CPU usage, memory usage, disk usage, running processes, hostname, IP address, and MAC address to a central **FastAPI server**.
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
-![Architecture](https://img.shields.io/badge/Architecture-Client--Server-orange)
-
----
-
-## Overview
-
-- **Nodes (clients)** authenticate with the server and periodically POST heartbeat payloads (CPU, memory, disk, processes, machine identifiers).
-- **Managers** use JWT-protected endpoints to view logs, metrics, summaries, and error logs for their team (employees reporting to that manager, plus the manager).
-- **Storage** uses SQLite via SQLAlchemy (`sqlite:///./sentinel.db` relative to the server working directory).
+The enhanced version adds **hierarchy-based monitoring**, where a senior can monitor only their directly assigned juniors.
 
 ---
 
-## Architecture
+## Key Enhancement: Hierarchy-Based Monitoring
 
-```
-                    Dashboard (Streamlit)
-                             |
-                             v
-                   FastAPI (server/)
-                             |
-              +--------------+---------------+
-              |                              |
-              v                              v
-         SQLite (sentinel.db)          Business logic / services
-              ^
-              |
-    +---------+---------+
-    v                   v
- Node client        Node client
- (client/)          (client/)
+Earlier, monitoring was mostly manager-based. Now the system supports organization-level post hierarchy.
+
+Example:
+
+```text
+Hierarchy Admin
+   ├── Senior Engineer A
+   │      ├── Junior Engineer 1
+   │      └── Junior Engineer 2
+   │
+   └── Senior Engineer B
+          ├── Junior Engineer 3
+          └── Junior Engineer 4
 ```
 
----
+Monitoring rule:
 
-## Repository layout
+```text
+A user can monitor another user only if:
+1. The target user directly reports to the logged-in user.
+2. The logged-in user has a higher post level.
+3. The logged-in user's post has monitoring permission.
+```
 
-| Path | Purpose |
-|------|---------|
-| `server/` | FastAPI application, SQLAlchemy models, routes, services |
-| `client/` | CLI agent: login, heartbeat loop, optional log fetch |
-| `dashboard/` | Streamlit UI for manager login and team views |
+So:
 
----
-
-## Backend capabilities (current)
-
-| Area | Implementation |
-|------|----------------|
-| Authentication | JWT access tokens (HS256), configured via environment |
-| Passwords | Hashed with **bcrypt** (direct library usage in `server/core/security.py`) |
-| REST API | OpenAPI docs at `/docs` when the server is running |
-| Persistence | SQLite; tables created on startup (`Base.metadata.create_all`) |
-
-### HTTP API summary
-
-**Public**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/` | Service identity message |
-| GET | `/health` | Simple health JSON |
-| POST | `/api/auth/register` | Register user (password policy enforced in routes) |
-| POST | `/api/auth/login` | Login; returns bearer token |
-
-**Authenticated (Bearer token)**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/node/heartbeat` | Ingest metrics and processes for the logged-in user |
-| GET | `/api/node/logs/{manager_id}` | Process logs for manager’s team (manager-only) |
-| GET | `/api/node/summary/{manager_id}` | Aggregated counts (manager-only) |
-| GET | `/api/node/metrics/{manager_id}` | Recent system metrics (manager-only) |
-| GET | `/api/node/errors/{manager_id}` | Error log entries (manager-only) |
-
-**Unauthenticated management endpoints (known limitation)**
-
-| Method | Path | Description |
-|--------|------|-------------|
-| PUT | `/api/auth/assign-manager` | Assign reporting manager to an employee |
-| PUT | `/api/auth/update-designation` | Update user designation |
-
-These two endpoints are not protected by JWT today; restrict network access or add authentication before production use.
+| Logged-in User    | Can Monitor                          |
+| ----------------- | ------------------------------------ |
+| Hierarchy Admin   | Senior Engineer A, Senior Engineer B |
+| Senior Engineer A | Junior Engineer 1, Junior Engineer 2 |
+| Senior Engineer B | Junior Engineer 3, Junior Engineer 4 |
+| Junior Engineers  | Nobody                               |
 
 ---
 
-## Configuration
+## System Flow
 
-Create a `.env` file in `server/` (or ensure variables are set in the environment). The server loads it via `python-dotenv`.
+```mermaid
+flowchart TD
+    A[Client Machine] -->|Login| B[FastAPI Server]
+    B -->|JWT Token| A
+    A -->|Heartbeat: CPU, RAM, Disk, Processes| B
 
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `SECRET_KEY` | JWT signing secret | Development fallback in code (override in production) |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` | JWT lifetime | `60` |
+    B --> C[(SQLite Database)]
+
+    D[Dashboard] -->|Login| B
+    D -->|Request Direct Juniors Data| B
+    B -->|Hierarchy Filtered Data| D
+```
 
 ---
 
-## Prerequisites
+## Project Structure
 
-- Python 3.10 or newer recommended (3.11 is commonly used).
-- pip
+```text
+SentinelHub/
+│
+├── server/
+│   ├── core/              # Config, security, dependencies
+│   ├── db/                # Database connection and models
+│   ├── routes/            # API routes
+│   ├── schemas/           # Request/response schemas
+│   ├── services/          # Business logic
+│   ├── scripts/           # Seed scripts
+│   └── main.py            # FastAPI entry point
+│
+├── client/
+│   ├── client.py          # Sends heartbeat data
+│   ├── monitor.py         # Collects system stats
+│   └── viewer.py          # Optional CLI viewer
+│
+├── dashboard/
+│   └── app.py             # Streamlit dashboard
+│
+├── requirements.txt
+└── README.md
+```
+
+---
+
+## Tech Stack
+
+| Component         | Technology |
+| ----------------- | ---------- |
+| Backend           | FastAPI    |
+| Database          | SQLite     |
+| ORM               | SQLAlchemy |
+| Authentication    | JWT        |
+| Password Hashing  | bcrypt     |
+| Dashboard         | Streamlit  |
+| Client Monitoring | psutil     |
+| Data Handling     | pandas     |
+
+---
+
+## Main Features
+
+* User registration and login
+* JWT-protected APIs
+* bcrypt password hashing
+* Client heartbeat monitoring
+* CPU, memory, disk, and process tracking
+* Machine information storage
+* Alert/error logging
+* Streamlit dashboard
+* Post-level hierarchy system
+* Direct junior monitoring
+* Secure hierarchy management endpoints
+
+---
+
+## Database Hierarchy Design
+
+New hierarchy support is mainly based on two concepts:
+
+### 1. Post Table
+
+Each post has a level and permission flags.
+
+Example posts:
+
+| Post            | Level | Can Monitor | Can Manage Hierarchy |
+| --------------- | ----: | ----------: | -------------------: |
+| Junior Engineer |     1 |           0 |                    0 |
+| Senior Engineer |     2 |           1 |                    0 |
+| Team Lead       |     3 |           1 |                    0 |
+| Manager         |     4 |           1 |                    0 |
+| Hierarchy Admin |     5 |           1 |                    1 |
+
+### 2. User Reporting Mapping
+
+Each user has:
+
+```text
+post_id
+reporting_officer_id
+```
+
+Example:
+
+```text
+Junior Engineer 1 reports to Senior Engineer A
+```
+
+Database mapping:
+
+```text
+Junior Engineer 1 reporting_officer_id = Senior Engineer A employee_id
+```
+
+---
+
+## Important API Endpoints
+
+### Authentication
+
+| Method | Endpoint             | Purpose                 |
+| ------ | -------------------- | ----------------------- |
+| POST   | `/api/auth/register` | Register user           |
+| POST   | `/api/auth/login`    | Login and get JWT token |
+
+### Hierarchy Management
+
+These require a user with `can_manage_hierarchy = 1`.
+
+| Method | Endpoint                             | Purpose                  |
+| ------ | ------------------------------------ | ------------------------ |
+| POST   | `/api/auth/posts`                    | Create post              |
+| PUT    | `/api/auth/update-post`              | Assign/update user post  |
+| PUT    | `/api/auth/assign-reporting-officer` | Assign reporting officer |
+
+### Monitoring
+
+| Method | Endpoint              | Purpose                          |
+| ------ | --------------------- | -------------------------------- |
+| POST   | `/api/node/heartbeat` | Send client heartbeat            |
+| GET    | `/api/node/juniors`   | View direct juniors              |
+| GET    | `/api/node/summary`   | View direct juniors summary      |
+| GET    | `/api/node/logs`      | View direct juniors process logs |
+| GET    | `/api/node/metrics`   | View direct juniors metrics      |
+| GET    | `/api/node/errors`    | View direct juniors alerts       |
 
 ---
 
 ## Installation
 
-### 1. Clone and enter the repository
+### 1. Clone the repository
 
 ```bash
+git clone <repository-url>
 cd SentinelHub
 ```
 
-### 2. Server dependencies
+### 2. Create virtual environment
 
-From the repository root:
+```bash
+python -m venv venv
+```
+
+Activate on Windows:
+
+```bash
+venv\Scripts\activate
+```
+
+### 3. Install dependencies
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-`requirements.txt` includes FastAPI, Uvicorn, SQLAlchemy, python-dotenv, bcrypt, and python-jose.
-
-### 3. Client dependencies
-
-The heartbeat client uses `requests`, `python-dotenv`, and `psutil`:
+If needed:
 
 ```bash
-python -m pip install requests python-dotenv psutil
+python -m pip install psutil pandas streamlit streamlit-autorefresh python-dotenv
 ```
-
-### 4. Dashboard dependencies
-
-```bash
-python -m pip install streamlit pandas requests streamlit-autorefresh
-```
-
-Optional: set `SERVER_URL` / service URL in environment or `.env` for clients; the dashboard currently defaults to `http://127.0.0.1:8000` in code unless you change it.
 
 ---
 
-## Running the server
+## Environment Setup
 
-Use the `server` directory as the working directory so package imports (`db`, `routes`, etc.) resolve.
+Create `.env` inside `server/`:
+
+```env
+SECRET_KEY=change-this-secret-key
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+```
+
+Create `.env` inside `dashboard/`:
+
+```env
+SERVER_URL=http://127.0.0.1:8000
+```
+
+---
+
+## Running the Server
 
 ```bash
 cd server
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-Alternatively:
+Open Swagger UI:
 
-```bash
-cd server
-python main.py
+```text
+http://127.0.0.1:8000/docs
 ```
-
-Interactive API documentation: `http://127.0.0.1:8000/docs`
 
 ---
 
-## Registration and login
+## Seed Default Posts
 
-Registration expects JSON aligned with the `RegisterUser` schema (see `server/schemas/schemas.py`), for example:
+Run this from the `server/` folder:
+
+```bash
+python scripts/seed_posts.py
+```
+
+This creates:
+
+```text
+Junior Engineer
+Senior Engineer
+Team Lead
+Manager
+Hierarchy Admin
+```
+
+---
+
+## Quick Testing Guide
+
+Use Swagger:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+### 1. Register Hierarchy Admin
 
 ```json
 {
-  "name": "BEL Employee",
-  "employee_id": 123456,
-  "password": "YourPass1!",
-  "designation": "engineer",
+  "name": "Admin User",
+  "employee_id": 100,
+  "password": "AdminPass1!",
+  "designation": "Hierarchy Admin",
+  "post_id": 5,
   "reporting_officer_id": null
 }
 ```
 
-Password rules (register): minimum length 8, uppercase, lowercase, digit, and one of `!@#$%^&*`, and at most **72 bytes** when UTF-8 encoded (bcrypt limit). Use `null` for no reporting officer; sending `0` for `reporting_officer_id` is treated as no manager.
-
-Login:
+### 2. Register Senior Engineer A
 
 ```json
 {
-  "employee_id": 123456,
-  "password": "YourPass1!"
+  "name": "Senior Engineer A",
+  "employee_id": 101,
+  "password": "SeniorA1!",
+  "designation": "Senior Engineer",
+  "post_id": 2,
+  "reporting_officer_id": 100
 }
 ```
 
-Response includes `access_token` for `Authorization: Bearer <token>`.
+### 3. Register Senior Engineer B
 
----
-
-## Running the client
-
-```bash
-cd client
-python client.py
+```json
+{
+  "name": "Senior Engineer B",
+  "employee_id": 102,
+  "password": "SeniorB1!",
+  "designation": "Senior Engineer",
+  "post_id": 2,
+  "reporting_officer_id": 100
+}
 ```
 
-The client logs in, sends heartbeats on an interval, and may fetch logs for the configured employee context (managers use their own employee ID when accessing manager-scoped endpoints).
+### 4. Register Junior Engineer 1 under Senior A
+
+```json
+{
+  "name": "Junior Engineer 1",
+  "employee_id": 201,
+  "password": "Junior1!",
+  "designation": "Junior Engineer",
+  "post_id": 1,
+  "reporting_officer_id": 101
+}
+```
+
+### 5. Register Junior Engineer 2 under Senior A
+
+```json
+{
+  "name": "Junior Engineer 2",
+  "employee_id": 202,
+  "password": "Junior2!",
+  "designation": "Junior Engineer",
+  "post_id": 1,
+  "reporting_officer_id": 101
+}
+```
+
+### 6. Register Junior Engineer 3 under Senior B
+
+```json
+{
+  "name": "Junior Engineer 3",
+  "employee_id": 203,
+  "password": "Junior3!",
+  "designation": "Junior Engineer",
+  "post_id": 1,
+  "reporting_officer_id": 102
+}
+```
 
 ---
 
-## Running the dashboard
+## Testing Monitoring Access
+
+### Login as Senior Engineer A
+
+```json
+{
+  "employee_id": 101,
+  "password": "SeniorA1!"
+}
+```
+
+Authorize Swagger using:
+
+```text
+Bearer <access_token>
+```
+
+Call:
+
+```text
+GET /api/node/juniors
+```
+
+Expected result:
+
+```text
+Senior Engineer A should see only:
+- Junior Engineer 1
+- Junior Engineer 2
+```
+
+Senior Engineer A should not see Junior Engineer 3.
+
+---
+
+## Testing Heartbeat
+
+Login as Junior Engineer 1 and authorize with Junior 1 token.
+
+Call:
+
+```text
+POST /api/node/heartbeat
+```
+
+Payload:
+
+```json
+{
+  "mac_address": "AA:BB:CC:DD:EE:201",
+  "hostname": "junior-1-pc",
+  "ip_address": "192.168.1.201",
+  "processes": ["python", "chrome", "vscode"],
+  "cpu_percent": 45,
+  "memory_percent": 60,
+  "disk_percent": 70
+}
+```
+
+Now login as Senior Engineer A and call:
+
+```text
+GET /api/node/logs
+GET /api/node/metrics
+```
+
+Senior Engineer A should see only Junior Engineer 1 and Junior Engineer 2 data.
+
+---
+
+## Running the Dashboard
+
+Open another terminal:
 
 ```bash
 cd dashboard
 streamlit run app.py
 ```
 
-Log in as a user with **manager** designation to use team-scoped endpoints from the UI.
+Dashboard opens at:
+
+```text
+http://localhost:8501
+```
+
+Login as:
+
+```text
+Employee ID: 101
+Password: SeniorA1!
+```
+
+Expected dashboard result:
+
+```text
+Direct Juniors:
+- Junior Engineer 1
+- Junior Engineer 2
+```
+
+Logs and metrics should show only the data of juniors under Senior Engineer A.
 
 ---
 
-## Database file
+## Security Improvements Added
 
-SQLite database file: `sentinel.db` is created under the **current working directory** when the server runs (typically `server/sentinel.db` if you start Uvicorn from `server/`).
-
----
-
-## Production readiness
-
-This project is intended as a **foundation / prototype**, not a hardened production deployment.
-
-**Already in place:** JWT authentication for protected node routes, bcrypt password hashing, structured logging and metrics persistence.
-
-**Still recommended before production:** HTTPS termination, secrets management, authenticated administrative routes, rate limiting, backups, monitoring, and deployment-specific hardening. WebSockets, push notifications, and horizontal scaling are not implemented.
+* Management endpoints are protected by JWT.
+* Only users with `can_manage_hierarchy = 1` can manage posts and reporting officers.
+* Dashboard does not pass `manager_id` manually.
+* Backend identifies logged-in user from JWT.
+* Users can monitor only direct juniors.
+* Changing URL employee IDs cannot expose other users' data.
 
 ---
 
-## Roadmap ideas
+## Contribution Summary
 
-- Secure `assign-manager` and `update-designation` with role-based authentication.
-- Optional POST endpoint for client-reported errors (schema exists; wiring may be added).
-- WebSocket or SSE for live dashboard updates.
-- TLS and reverse proxy documentation.
+This enhancement upgrades SentinelHub from simple manager-based monitoring to proper hierarchy-based organization monitoring.
+
+Main contribution:
+
+```text
+Added post-level hierarchy monitoring with direct junior access control.
+```
+
+Implemented:
+
+* `Post` model
+* `post_id` in users
+* hierarchy permission flags
+* direct junior filtering
+* hierarchy management APIs
+* updated dashboard APIs
+* seed script for posts
+* safe testing workflow
 
 ---
 
-## Contributing
+## Future Improvements
 
-1. Fork the repository  
-2. Create a branch for your changes  
-3. Submit a pull request with a clear description  
+* Add Alembic migrations
+* Add PostgreSQL support
+* Add Docker setup
+* Add real-time WebSocket dashboard
+* Add audit logs for hierarchy changes
+* Add CSV/PDF report export
+* Add better client process monitoring
+* Add unit and integration tests
+
+---
+
+## Final Note
+
+SentinelHub now ensures:
+
+```text
+Senior Engineer A can monitor only juniors under Senior Engineer A.
+Senior Engineer B can monitor only juniors under Senior Engineer B.
+Hierarchy Admin can monitor only direct seniors.
+Junior users cannot monitor anyone.
+```
+
+This makes the project more suitable for real organization-based monitoring systems.

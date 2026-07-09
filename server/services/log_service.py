@@ -49,3 +49,31 @@ def get_manager_logs(db: Session, manager_id: int, limit: int = 100):
     except Exception as e:
         logger.error(f"[LOG_SERVICE] Error: {str(e)}")
         raise HTTPException(500, "Internal server error")
+    
+
+def get_logs_for_employee_ids(db, employee_ids, limit: int = 500):
+    if not employee_ids:
+        return []
+
+    logs = (
+        db.query(ProcessLog, Machine)
+        .join(Machine, ProcessLog.mac_address == Machine.mac_address)
+        .filter(ProcessLog.employee_id.in_(employee_ids))
+        .order_by(ProcessLog.timestamp.desc())
+        .limit(limit)
+        .all()
+    )
+
+    return [
+        {
+            "employee_id": log.employee_id,
+            "process_name": log.process_name,
+            "mac_address": log.mac_address,
+            "hostname": machine.hostname,
+            "ip_address": machine.ip_address,
+            "timestamp": log.timestamp
+        }
+        for log, machine in logs
+    ]
+
+    

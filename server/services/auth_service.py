@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
-from db.models import User
+from db.models import User, Post
 from core.security import hash_password, verify_password, create_token
 from core.logger import logger
 from fastapi import HTTPException, status
-
+from services.hierarchy_service import validate_reporting_assignment
 
 # ---------------- REGISTER ---------------- #
 
@@ -46,6 +46,7 @@ def register_user(db: Session, user):
             employee_id=employee_id,
             password=hash_password(str(user.password)),
             designation=user.designation,
+            post_id=user.post_id,
             reporting_officer_id=reporting_officer_id,
         )
 
@@ -200,3 +201,75 @@ def update_designation(db: Session, employee_id: int, designation: str):
         db.rollback()
         logger.error(f"[PROMOTION ERROR] {str(e)}")
         raise HTTPException(500, "Internal server error")
+    
+
+
+
+
+
+
+#----------------- CREATE POST ---------------- for hierarchy#
+def create_post(db, data):
+    existing = db.query(Post).filter(Post.title == data.title).first()
+
+    if existing:
+        raise HTTPException(status_code=400, detail="Post already exists")
+
+    post = Post(
+        title=data.title,
+        level=data.level,
+        can_monitor=1 if data.can_monitor else 0,
+        can_manage_hierarchy=1 if data.can_manage_hierarchy else 0
+    )
+
+    db.add(post)
+    db.commit()
+    db.refresh(post)
+
+    return {
+        "status": "success",
+        "message": "Post created successfully",
+        "post_id": post.id
+    }    
+
+#----------------- UPDATE USER POST ---------------- for hierarchy#
+def update_user_post(db, employee_id: int, post_id: int):
+    user = db.query(User).filter(User.employee_id == employee_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    post = db.query(Post).filter(Post.id == post_id).first()
+
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    user.post_id = post.id
+
+    # Backward compatibility: old project still uses designation
+    user.designation = post.title
+
+    db.commit()
+    db.refresh(user)
+
+    return {
+        "status": "success",
+        "message": "User post updated successfully"
+    }
+
+#----------------- ASSIGN REPORTING OFFICER ---------------- for hierarchy#
+def assign_reporting_officer(db, employee_id: int, reporting_officer_id: int):
+    employee = db.query(User).filter(User.employee_id == employee_id).first()
+    officer = db.query(User).filter(User.employee_id == reporting_officer_id).first()
+
+    validate_reporting_assignment(employee, officer)
+
+    employee.reporting_officer_id = reporting_officer_id
+
+    db.commit()
+    db.refresh(employee)
+
+    return {
+        "status": "success",
+        "message": "Reporting officer assigned successfully"
+    }

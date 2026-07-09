@@ -4,6 +4,7 @@ import os
 import socket
 from dotenv import load_dotenv
 from monitor import get_system_stats
+import uuid
 
 # Load environment variables
 load_dotenv()
@@ -155,5 +156,4 @@ def main():
 
 
 if __name__ == "__main__":
-    import uuid  # needed for MAC address
     main()

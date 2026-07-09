@@ -12,6 +12,14 @@ from services.summary_service import get_summary
 from core.security import decode_token
 from core.logger import logger
 
+from core.dependencies import get_db, get_current_user
+from services.hierarchy_service import get_direct_monitorable_junior_ids
+from services.log_service import get_logs_for_employee_ids
+from services.summary_service import get_summary_for_employee_ids
+from services.metrics_service import get_metrics_for_employee_ids
+from services.error_service import get_errors_for_employee_ids
+from services.dashboard_service import get_dashboard_live_data
+
 router = APIRouter(prefix="/api/node")
 security = HTTPBearer()
 
@@ -88,50 +96,79 @@ def heartbeat(
 # ---------------- LOGS ---------------- #
 
 @router.get("/logs/{manager_id}")
-def get_logs(
+def get_logs_old(
     manager_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    validate_manager_access(user, manager_id)
+    # Backward compatibility check
+    # Old dashboard sends manager_id in URL.
+    # But logged-in user must match that ID.
+    if user.employee_id != manager_id:
+        logger.warning(
+            f"[SECURITY] Unauthorized old logs route access: "
+            f"{user.employee_id} tried to access {manager_id}"
+        )
+        raise HTTPException(status_code=403, detail="Access denied")
 
-    logger.info(f"[ROUTE] Logs requested by {user.employee_id}")
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
 
-    return get_manager_logs(db, manager_id)
+    logger.info(
+        f"[ROUTE] Old logs route used by {user.employee_id}; "
+        f"direct juniors: {junior_ids}"
+    )
+
+    return get_logs_for_employee_ids(db, junior_ids)
 
 
 # ---------------- SUMMARY ---------------- #
 
 @router.get("/summary/{manager_id}")
-def summary(
+def summary_old(
     manager_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    validate_manager_access(user, manager_id)
+    if user.employee_id != manager_id:
+        logger.warning(
+            f"[SECURITY] Unauthorized old summary route access: "
+            f"{user.employee_id} tried to access {manager_id}"
+        )
+        raise HTTPException(status_code=403, detail="Access denied")
 
-    logger.info(f"[ROUTE] Summary requested by {user.employee_id}")
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
 
-    return get_summary(db, manager_id)
+    logger.info(
+        f"[ROUTE] Old summary route used by {user.employee_id}; "
+        f"direct juniors: {junior_ids}"
+    )
+
+    return get_summary_for_employee_ids(db, junior_ids)
 
 
 # ---------------- METRICS ---------------- #
 
 @router.get("/metrics/{manager_id}")
-def get_metrics(
+def get_metrics_old(
     manager_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    validate_manager_access(user, manager_id)
+    if user.employee_id != manager_id:
+        logger.warning(
+            f"[SECURITY] Unauthorized old metrics route access: "
+            f"{user.employee_id} tried to access {manager_id}"
+        )
+        raise HTTPException(status_code=403, detail="Access denied")
 
-    logger.info(f"[ROUTE] Metrics requested by {user.employee_id}")
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
 
-    employee_ids = get_team_employee_ids(db, manager_id)
+    if not junior_ids:
+        return []
 
     metrics = (
         db.query(SystemMetrics)
-        .filter(SystemMetrics.employee_id.in_(employee_ids))
+        .filter(SystemMetrics.employee_id.in_(junior_ids))
         .order_by(SystemMetrics.timestamp.desc())
         .limit(500)
         .all()
@@ -149,24 +186,29 @@ def get_metrics(
         for m in metrics
     ]
 
-
 # ---------------- ERROR LOGS ---------------- #
 
 @router.get("/errors/{manager_id}")
-def get_errors(
+def get_errors_old(
     manager_id: int,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user)
 ):
-    validate_manager_access(user, manager_id)
+    if user.employee_id != manager_id:
+        logger.warning(
+            f"[SECURITY] Unauthorized old errors route access: "
+            f"{user.employee_id} tried to access {manager_id}"
+        )
+        raise HTTPException(status_code=403, detail="Access denied")
 
-    logger.info(f"[ROUTE] Errors requested by {user.employee_id}")
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
 
-    employee_ids = get_team_employee_ids(db, manager_id)
+    if not junior_ids:
+        return []
 
     errors = (
         db.query(ErrorLog)
-        .filter(ErrorLog.employee_id.in_(employee_ids))
+        .filter(ErrorLog.employee_id.in_(junior_ids))
         .order_by(ErrorLog.timestamp.desc())
         .limit(100)
         .all()
@@ -183,3 +225,83 @@ def get_errors(
         }
         for e in errors
     ]
+
+
+#----------------- JUNIORS ---------------- #
+@router.get("/juniors")
+def get_my_juniors(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
+
+    juniors = (
+        db.query(User)
+        .filter(User.employee_id.in_(junior_ids))
+        .all()
+    )
+
+    return [
+        {
+            "employee_id": junior.employee_id,
+            "name": junior.name,
+            "designation": junior.designation,
+            "post": junior.post.title if junior.post else None,
+            "level": junior.post.level if junior.post else None
+        }
+        for junior in juniors
+    ]
+
+#------------------ JUNIOR LOGS ---------------- #
+@router.get("/logs")
+def get_my_junior_logs(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
+    return get_logs_for_employee_ids(db, junior_ids)
+
+#------------------ JUNIOR SUMMARY ---------------- #
+@router.get("/summary")
+def get_my_junior_summary(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
+    return get_summary_for_employee_ids(db, junior_ids)
+
+#------------------ JUNIOR METRICS ---------------- #
+@router.get("/metrics")
+def get_my_junior_metrics(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
+
+    return get_metrics_for_employee_ids(
+        db,
+        junior_ids
+    )
+
+
+@router.get("/errors")
+def get_my_junior_errors(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    junior_ids = get_direct_monitorable_junior_ids(db, user)
+
+    return get_errors_for_employee_ids(
+        db,
+        junior_ids
+    )
+
+@router.get("/dashboard/live")
+def get_dashboard_live(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user)
+):
+    return get_dashboard_live_data(
+        db,
+        user
+    )
